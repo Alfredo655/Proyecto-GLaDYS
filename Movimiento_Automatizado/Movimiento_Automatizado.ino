@@ -1,37 +1,37 @@
-#include <AccelStepper.h>
+#include <Stepper.h>
 
-// Definir los pines para el motor paso a paso
-#define STEP_PIN 2
-#define DIR_PIN 3
+// Definir el número de pasos por revolución del motor (ajusta según tu motor)
+const int stepsPerRevolution = 2048;
 
-// Crear una instancia de AccelStepper para el motor paso a paso
-AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
+// Crear una instancia de la clase Stepper
+Stepper myStepper(stepsPerRevolution, 8, 10, 9, 11);
 
-int posX = 90; // Posición inicial del motor paso a paso
-int stepSpeed = 100; // Velocidad de paso del motor
+// Pines del joystick
+const int joyXPin = A0;
+const int joyYPin = A1;
+
+// Valores de umbral para detectar movimiento
+const int threshold = 50;
 
 void setup() {
-  stepper.setMaxSpeed(1000); // Ajusta la velocidad máxima
-  stepper.setAcceleration(500); // Ajusta la aceleración
+  // Establecer la velocidad del motor (ajusta según tus necesidades)
+  myStepper.setSpeed(10); // Velocidad en RPM
   Serial.begin(9600);
 }
 
 void loop() {
-  if (Serial.available() > 0) {
-    String data = Serial.readStringUntil('\n');
-    int commaIndex = data.indexOf(',');
+  int joyXValue = analogRead(joyXPin);
+  int joyYValue = analogRead(joyYPin);
 
-    if (commaIndex > 0) {
-      int cx = data.substring(0, commaIndex).toInt();
-      int cy = data.substring(commaIndex + 1).toInt();
-
-      // Mapeo de coordenadas de la cámara a los pasos del motor
-      // Ajusta el rango de mapeo según la resolución y el rango del motor
-      int targetPosX = map(cx, 0, 640, 0, 200); // Ajusta 640 y 200 según tu configuración
-
-      // Mover el motor paso a paso a la posición calculada
-      stepper.moveTo(targetPosX);
-      stepper.run();
-    }
+  // Mover el motor según la posición del joystick en el eje X
+  if (joyXValue > (512 + threshold)) {
+    // Mover en sentido horario
+    myStepper.step(stepsPerRevolution / 100);
+  } else if (joyXValue < (512 - threshold)) {
+    // Mover en sentido antihorario
+    myStepper.step(-stepsPerRevolution / 100);
   }
+
+  // (Opcional) También podrías usar el eje Y para controlar otro motor o función
+  // Aquí solo movemos el motor en función del eje X
 }
