@@ -1,37 +1,75 @@
-#include <Stepper.h>
+#include <Servo.h>
 
-// Definir el número de pasos por revolución del motor (ajusta según tu motor)
-const int stepsPerRevolution = 2048;
+Servo servoX;  // Servo para el eje X
+Servo servoY;  // Servo para el eje Y
 
-// Crear una instancia de la clase Stepper
-Stepper myStepper(stepsPerRevolution, 8, 10, 9, 11);
+int posX = 90;  // Posiciones iniciales de los servos (centrado)
+int posY = 90;
 
-// Pines del joystick
-const int joyXPin = A0;
-const int joyYPin = A1;
+const int ledRed = 11;     // Pin del LED rojo (ninguna cara detectada)
+const int ledYellow = 12;  // Pin del LED amarillo (cara detectada pero no centrada)
+const int ledGreen = 13;   // Pin del LED verde (cara detectada y centrada)
 
-// Valores de umbral para detectar movimiento
-const int threshold = 50;
+const int threshold = 20;  // Umbral para considerar el rostro "centrado"
 
 void setup() {
-  // Establecer la velocidad del motor (ajusta según tus necesidades)
-  myStepper.setSpeed(10); // Velocidad en RPM
+  // Inicializar los servos en los pines correspondientes
+  servoX.attach(9);  // Cambia el pin si es necesario
+  servoY.attach(10); // Cambia el pin si es necesario
+  
+  // Inicializar los pines de los LEDs
+  pinMode(ledRed, OUTPUT);
+  pinMode(ledYellow, OUTPUT);
+  pinMode(ledGreen, OUTPUT);
+  
+  // Asegurarse de que todos los LEDs están apagados al inicio
+  digitalWrite(ledRed, LOW);
+  digitalWrite(ledYellow, LOW);
+  digitalWrite(ledGreen, LOW);
+
+  // Inicializar comunicación serial
   Serial.begin(9600);
 }
 
 void loop() {
-  int joyXValue = analogRead(joyXPin);
-  int joyYValue = analogRead(joyYPin);
+  // Si se han recibido datos por el puerto serial
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n');
+    
+    // Comprobar si se ha recibido alguna cara
+    if (data == "NO_FACE") {
+      // No hay cara detectada: encender LED rojo y apagar los otros
+      digitalWrite(ledRed, HIGH);
+      digitalWrite(ledYellow, LOW);
+      digitalWrite(ledGreen, LOW);
+    } else {
+      // Parsear las coordenadas recibidas
+      int commaIndex = data.indexOf(',');
+      if (commaIndex > 0) {
+        int deltaX = data.substring(0, commaIndex).toInt();
+        int deltaY = data.substring(commaIndex + 1).toInt();
+        
+        // Ajustar las posiciones de los servos en función del deltaX y deltaY
+        posX = constrain(posX + deltaX / 20, 0, 180);  // Ajusta la sensibilidad
+        posY = constrain(posY + deltaY / 20, 0, 180);
 
-  // Mover el motor según la posición del joystick en el eje X
-  if (joyXValue > (512 + threshold)) {
-    // Mover en sentido horario
-    myStepper.step(stepsPerRevolution / 100);
-  } else if (joyXValue < (512 - threshold)) {
-    // Mover en sentido antihorario
-    myStepper.step(-stepsPerRevolution / 100);
+        // Mover los servos a las posiciones calculadas
+        servoX.write(posX);
+        servoY.write(posY);
+
+        // Verificar si el rostro está lo suficientemente centrado
+        if (abs(deltaX) < threshold && abs(deltaY) < threshold) {
+          // Cara centrada: encender LED verde y apagar los otros
+          digitalWrite(ledGreen, HIGH);
+          digitalWrite(ledRed, LOW);
+          digitalWrite(ledYellow, LOW);
+        } else {
+          // Cara detectada pero no centrada: encender LED amarillo y apagar los otros
+          digitalWrite(ledYellow, HIGH);
+          digitalWrite(ledRed, LOW);
+          digitalWrite(ledGreen, LOW);
+        }
+      }
+    }
   }
-
-  // (Opcional) También podrías usar el eje Y para controlar otro motor o función
-  // Aquí solo movemos el motor en función del eje X
 }
